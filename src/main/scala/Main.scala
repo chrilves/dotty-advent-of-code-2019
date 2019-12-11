@@ -38,6 +38,7 @@ trait Day {
     case 4 => Day4
     case 5 => Day5
     case 6 => Day6
+    case 7 => Day7
   }
 
   val input = Source.fromFile(inputFile).mkString
