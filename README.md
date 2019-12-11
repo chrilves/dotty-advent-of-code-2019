@@ -1,9 +1,11 @@
-## sbt project compiled with Dotty
+## [Advent Of Code 2019](https://adventofcode.com/) in Dotty (aka. Scala 3)
 
 ### Usage
 
-This is a normal sbt project, you can compile code with `sbt compile` and run it
-with `sbt run`, `sbt console` will start a Dotty REPL.
+`sbt run <day number> <path to input file> <part>`
 
-For more information on the sbt-dotty plugin, see the
-[dotty-example-project](https://github.com/lampepfl/dotty-example-project/blob/master/README.md).
+where
+
+- `<day number>` is an integer between *1* and *25*
+- `<path to input file>` is the file path of the puzzle input
+- `<part>` is either *1* or *2*
