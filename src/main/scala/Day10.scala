@@ -3,7 +3,7 @@ import scala.annotation._
 
 object Day10 extends Day {
   type Input  = Array[Array[Boolean]]
-  type Output = String
+  type Output = Int
 
   def parseInput(s: String): Input = 
     s.split("\n").map(_.toArray.map {
@@ -109,7 +109,7 @@ object Day10 extends Day {
     val b = best(i)
     log(b.toString)
 
-    b._2.toString
+    b._2
   }
 
   def partTwo(i: Input): Output = {
@@ -131,13 +131,34 @@ object Day10 extends Day {
         if asteroidIn(p) && p != station
       yield p -> station.to(p)
     
-    final class Result(pos: Pos, dir: UVec2D, index: Int)
-    
-    def key(z : (Pos, Vec2D)): UVec2D = z._2.uvec2d
+    final case class Result(pos: Pos, dir: UVec2D, index: Int)
 
-    val z : Int =
-      ateroids.groupBy(_._2.uvec2d)
+    object Result {
+      given resultOrdering : Ordering[Result] {
+        def compare(r1: Result, r2: Result): Int =
+          Ordering[Int].compare(r1.index, r2.index) match {
+            case 0 => Ordering[UVec2D].compare(r1.dir, r2.dir)
+            case r => r
+          }
+      }
+    }
     
-    ""
+    val sorted : List[Result] =
+      ateroids
+        .groupBy(_._2.uvec2d)
+        .toList
+        .flatMap { case (uvec, l) =>
+          l.sortBy(_._2.norm).zipWithIndex.map { case ((pos, _), index) =>
+            Result(pos, uvec, index)
+          }
+        }
+        .sorted
+
+    sorted.foreach(r => log(r.toString))
+
+    val _200th = sorted.drop(199).head
+
+    log(s"200th = ${_200th}")
+    _200th.pos.x * 100 + _200th.pos.y  
   }
 }
