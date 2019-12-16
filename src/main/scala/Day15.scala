@@ -306,7 +306,15 @@ object Day15 extends Day {
     
     import Process._
 
-    val driver : 
+    lazy val driver: Process[Status, Dir, Unit] =
+      for
+        _ <- output(Dir.North)
+        status <- input[Status]
+        _ = log(s"Recieved status $status")
+        _ <- driver
+      yield ()
+    
+    program.duo(driver)
     ""
   }
     
