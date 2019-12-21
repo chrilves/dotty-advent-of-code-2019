@@ -47,13 +47,14 @@ object Day12 extends Day {
       }
     }
 
-  given systemOps : (l: List[Moon]) {
+  given systemOps : (l: List[Moon]) extended with {
     inline def oneStep: List[Moon] =
       l.map { moon =>
         moon.update(moon.position.gravities(l.map(_.position)))
       }
     
-    inline def steps(n: Long): List[Moon] =
+    @tailrec
+    def steps(n: Long): List[Moon] =
       if n <= 0
       then l
       else l.oneStep.steps(n - 1)
@@ -93,7 +94,7 @@ object Day12 extends Day {
     }
   }
 
-  given dimOps : [A](l: List[Dim[A]]) {
+  given dimOps : [A](l: List[Dim[A]]) extended with {
     inline def oneStep: List[Dim[A]] =
       l.map(_.update(l))
     
