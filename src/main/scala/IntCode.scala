@@ -5,6 +5,9 @@ object IntCode {
   trait StateIO[+I,-O,A] {
     def (a:A) read : (I, A)
     def (a:A) write(x: O): A
+
+    inline final def (a:A) writes(xs: Vector[O]): A =
+      xs.foldLeft(a) { case (acc, x) => acc.write(x) }
   }
 
   type PreProcess[-I,+BI,+O,+A] = Either[A, I => Process[I,BI,O,A]]
@@ -13,6 +16,12 @@ object IntCode {
     import Process._
 
     def output: Vector[O]
+
+    def fullMap[I2,BI2,O2,A2](f: I2 => I, g: BI => BI2, h: O => O2, k: A => A2): Process[I2,BI2,O2,A2] =
+      this match {
+        case End(ins,a,outs)  => End(ins.map(g),k(a),outs.map(h))
+        case Read(cont, outs) => Read((i2:I2) => cont(f(i2)).fullMap(f,g,h,k), outs.map(h))
+      }
 
     inline private def addOuts[O2>:O](outs: Vector[O2]): Process[I,BI,O2,A] =
       this match {
@@ -50,7 +59,7 @@ object IntCode {
         case Read(cont, outs) => Read((i:I) => cont(i).map(f), outs)
       }
     
-    final def flatMap[I2>:BI,BI2>:BI,O2>:O,B](f: A => Process[I2,BI2,O2,B]): Process[I&I2,BI2,O2,B] =
+    final def flatMap[I2<:I,BI2>:BI,O2>:O,B](f: A => Process[I2|BI,BI2,O2,B]): Process[I2,BI2,O2,B] =
       this match {
         case End(ins, a, outs) => f(a).sends(ins).addOuts(outs)
         case Read(cont, outs)  => Read((i:I) => cont(i).flatMap(f), outs)
@@ -91,19 +100,16 @@ object IntCode {
         val (p, outs) = this.collectOutput
         (p.sends(outs: Vector[O2]):Process[I, O2|BI, O, A]).loop[I2,O2]
       }
-/*
+
     @tailrec
-    final def run[S: [X] =>> StateIO[I,O,X]](s: S): (A, S) =
+    final def run[S: [X] =>> StateIO[I,O,X]](s: S): (Vector[BI], A, S) =
       this match {
-        case End(a) =>
-          (a, s)
-        case Input(cont) =>
-          val (r, s2) = s.read
+        case End(ins,a,outs) =>
+          (ins, a, s.writes(outs))
+        case Read(cont, outs) =>
+          val (r, s2) = s.writes(outs).read
           cont(r).run(s2)
-        case Output(o, t) =>
-          t.run(s.write(o))
       }
-  */
   }
 
   object Process {
@@ -118,6 +124,22 @@ object IntCode {
     
     inline def output[O](o : O*): Process[Any, Nothing, O, Unit] =
       End(Vector.empty, (), o.toVector)
+
+    def arr[I,O](f: I => O): Process[I,Nothing,O,Nothing] = {
+      def aux(i: I): Process[I,Nothing,O,Nothing] =
+        Read(aux, Vector(f(i)))
+
+      Read(aux, Vector.empty)
+    }
+
+    def stateArr[I,O,S](s:S)(f: (I,S) => (O,S)): Process[I,Nothing,O,Nothing] = {
+      def aux(s2: S)(i: I): Process[I,Nothing,O,Nothing] = {
+        val (o,s3) = f(i,s)
+        Read(aux(s3), Vector(o))
+      }
+
+      Read(aux(s), Vector.empty)
+    }
 
 
     inline private def addOuts[I,BI,O,A](self: Process[I,BI,O,A], outs: Vector[O]): Process[I,BI,O,A] =
@@ -153,7 +175,7 @@ object IntCode {
     
     final def chain[I,BI,O,BO,X,A,B](self: Process[I,BI,O,A], p: Process[O, BO, X, B]): Process[I, BI, X, (PreProcess[I,BI,O,A], Process[O,O|BO,X,B])] = {
       val (p1, outs1) = self.collectOutput
-      val (p2, outs2) = p.sends(outs1).collectOutput
+      val (p2, outs2) = sends(p, outs1).collectOutput
 
       (p1,p2) match {
         case (Read(cont1, _) , Read(_,_)    ) => Read((i:I) => chain(cont1(i), p2), outs2)
