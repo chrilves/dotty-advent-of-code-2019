@@ -1,5 +1,8 @@
 val dottyVersion = "0.21.0-RC1"
 
+enablePlugins(JavaAppPackaging)
+Compile / run / fork := true
+
 lazy val root = project
   .in(file("."))
   .settings(

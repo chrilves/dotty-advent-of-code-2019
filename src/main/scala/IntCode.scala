@@ -1,3 +1,5 @@
+package dottyaoc
+
 import scala.annotation._
 
 object IntCode {
@@ -23,19 +25,25 @@ object IntCode {
         case Read(cont, outs) => Read((i2:I2) => cont(f(i2)).fullMap(f,g,h,k), outs.map(h))
       }
 
+    def mapIO[I2,O2](f: I2 => I, g: O => O2): Process[I2,BI,O2,A] =
+      this match {
+        case End(ins,a,outs)  => End(ins,a,outs.map(g))
+        case Read(cont, outs) => Read((i2:I2) => cont(f(i2)).mapIO(f,g), outs.map(g))
+      }
+
     inline private def addOuts[O2>:O](outs: Vector[O2]): Process[I,BI,O2,A] =
       this match {
         case End(ins, result, outs2) => End(ins, result, outs2 ++ outs)
         case Read(k, outs2) => Read(k, outs2 ++ outs)
       }
 
-    final def collectOutput: (Process[I,BI,O,A], Vector[O]) =
+    inline final def collectOutput: (Process[I,BI,O,A], Vector[O]) =
       this match {
         case End(ins, a, outs) => (End(ins, a, Vector.empty), outs)
         case Read(cont, outs) => (Read(cont, Vector.empty), outs)
       }
 
-    final def send[I2<:I](i: I2): Process[I,I2|BI,O,A] =
+    inline final def send[I2<:I](i: I2): Process[I,I2|BI,O,A] =
       this match {
         case End(ins, result, outs) => End(i +: ins, result, outs)
         case Read(cont, outs) => cont(i).addOuts(outs)
@@ -53,6 +61,21 @@ object IntCode {
         }
       }
 
+    inline final def send_[I2<:I, A2>:A](i: I2)(given erased A2 =:= Nothing): Process[I,BI,O,A2] =
+      this match {
+        case Read(cont, outs) => cont(i).addOuts(outs)
+      }
+
+    @tailrec
+    final def sends_[I2<:I, A2>:A](ins: Vector[I2])(given erased A2 =:= Nothing): Process[I,BI,O,A2] =
+      if ins.isEmpty
+      then this
+      else this match {
+        case Read(cont, outs) => cont(ins.last) match {
+          case Read(k, outs2) => Read(k, outs2 ++ outs).sends_(ins.init)
+        }
+      }
+
     final def map[B](f: A => B): Process[I,BI,O,B] =
       this match {
         case End(ins, a, outs) => End(ins, f(a), outs)
@@ -65,7 +88,7 @@ object IntCode {
         case Read(cont, outs)  => Read((i:I) => cont(i).flatMap(f), outs)
       }
 
-    final def toPreProcess: End[BI,O, PreProcess[I,BI,O,A]] =
+    inline final def toPreProcess: End[BI,O, PreProcess[I,BI,O,A]] =
       this match {
         case End(ins, a, outs) => End(ins, Left(a), outs)
         case Read(cont, outs)  => End(Vector.empty, Right(cont), outs) 
@@ -79,6 +102,26 @@ object IntCode {
         case (Read(cont1, _) , Read(_,_)    ) => Read((i:I) => cont1(i).chain(p2), outs2)
         case (Read(cont1, _) , End(insb,b,_)) => End(Vector.empty, (Right(cont1), p2), outs2)
         case (End(insa, a, _), _            ) => End(insa        , (Left(a)     , p2), outs2)
+      }
+    }
+
+    final def post[X,BI2](p: Process[O, BI2, X, Nothing]): Process[I, BI, X, A] = {
+      val (p1, outs1) = this.collectOutput
+      val (p2, outs2) = p.sends_(outs1).collectOutput
+
+      (p1,p2) match {
+        case (Read(cont1, _) , Read(_,_)    ) => Read((i:I) => cont1(i).post(p2), outs2)
+        case (End(insa, a, _), _            ) => End(insa, a, outs2)
+      }
+    }
+
+    final def pre[I2<:I,X,BX](p: Process[X, BX, I2, Nothing]): Process[X, I2|BI, O, A] = {
+      val (p1, outs1) = p.collectOutput
+      val (p2, outs2) = this.sends(outs1).collectOutput
+
+      (p1,p2) match {
+        case (Read(cont1, _) , Read(_,_)    ) => Read((x:X) => p2.pre(cont1(x)), outs2)
+        case (Read(cont1, _) , End(insb,b,_)) => End(insb, b, outs2)
       }
     }
 
@@ -141,68 +184,6 @@ object IntCode {
       Read(aux(s), Vector.empty)
     }
 
-
-    inline private def addOuts[I,BI,O,A](self: Process[I,BI,O,A], outs: Vector[O]): Process[I,BI,O,A] =
-      self match {
-        case End(ins, result, outs2) => End(ins, result, outs2 ++ outs)
-        case Read(k, outs2) => Read(k, outs2 ++ outs)
-      }
-    
-    final def send[I,BI>:I,O,A](self: Process[I,BI,O,A], i: I): Process[I,I|BI,O,A] =
-      self match {
-        case End(ins, result, outs) => End(i +: ins, result, outs)
-        case Read(cont, outs) => addOuts(cont(i), outs)
-      }
-  
-    @tailrec
-    final def sends[I,BI,O,A](self: Process[I,BI,O,A], ins: Vector[I]): Process[I,I|BI,O,A] =
-      if ins.isEmpty
-      then self
-      else self match {
-        case End(ins2, r, outs) => End(ins ++ ins2, r, outs)
-        case Read(cont, outs) => cont(ins.last) match {
-          case End(ins2, result, outs2) => End(ins.init ++ ins2, result, outs2 ++ outs)
-          case Read(k, outs2) => sends(Read(k, outs2 ++ outs), ins.init)
-        }
-      }
-  
-      
-    final def flatMap[I,BI>:I,O,A,B](self: Process[I,BI,O,A], f: A => Process[BI,BI,O,B]): Process[I,BI,O,B] =
-      self match {
-        case End(ins, a, outs) => addOuts(sends(f(a), ins), outs)
-        case Read(cont, outs)  => Read((i:I) => flatMap(cont(i), f), outs)
-      }
-    
-    final def chain[I,BI,O,BO,X,A,B](self: Process[I,BI,O,A], p: Process[O, BO, X, B]): Process[I, BI, X, (PreProcess[I,BI,O,A], Process[O,O|BO,X,B])] = {
-      val (p1, outs1) = self.collectOutput
-      val (p2, outs2) = sends(p, outs1).collectOutput
-
-      (p1,p2) match {
-        case (Read(cont1, _) , Read(_,_)    ) => Read((i:I) => chain(cont1(i), p2), outs2)
-        case (Read(cont1, _) , End(insb,b,_)) => End(Vector.empty, (Right(cont1), p2), outs2)
-        case (End(insa, a, _), _            ) => End(insa        , (Left(a)     , p2), outs2)
-      }
-    }
-  
-    @tailrec
-    final def duo[I,BI,O,BO,A,B](self: Process[I,BI,O,A], p: Process[O, BO, I, B]): (Process[I,I|BI,O,A], Process[O,O|BO,I,B]) =
-      if (self.output.isEmpty && p.output.isEmpty)
-      then (self, p)
-      else {
-        val (p1, outs1) = self.collectOutput
-        val (p2, outs2) = p.collectOutput
-        duo(sends(p1, outs2), sends(p2, outs1))
-      }
-  
-    @tailrec
-    final def loop[I,BI,O<:I,A](self: Process[I,BI,O,A]): Process[O,O|BI,O,A] =
-      if self.output.isEmpty
-      then self
-      else {
-        val (p, outs) = self.collectOutput
-        loop(sends(p, outs))
-      }
-    
     def ofPreProcess[I,BI,O,A](pp: PreProcess[I,BI,O,A]): Process[I,BI,O,A] =
       pp match {
         case Left(a)     => Process.pure(a)
@@ -252,7 +233,7 @@ object IntCode {
             Read( { cin =>
               program(pointer(1)) = cin
               runTrick(base, addr + 2, Nil)
-            }, out.reverse.toVector)
+            }, out.toVector)
   
           case 4 => // Write
             val cout = arg(1)
@@ -281,7 +262,7 @@ object IntCode {
             run(newBase, addr + 2, out)
   
           case 99 => // Halt
-            End(Vector.empty, (), out.reverse.toVector)
+            End(Vector.empty, (), out.toVector)
         }
       }
   
@@ -337,7 +318,7 @@ object IntCode {
             Read( { cin =>
               val prog2 = prog + (pointer(1) -> cin)
               runTrick(prog2, base, addr + 2, Nil)
-            }, out.reverse.toVector)
+            }, out.toVector)
   
           case 4 => // Write
             val cout = arg(1)
@@ -366,7 +347,7 @@ object IntCode {
             run(prog, newBase, addr + 2, out)
   
           case 99 => // Halt
-            End(Vector.empty, (), out.reverse.toVector)
+            End(Vector.empty, (), out.toVector)
         }
       }
       run(initialProgram, 0,0, Nil)

@@ -1,3 +1,5 @@
+package dottyaoc
+
 import scala.annotation.tailrec
 
 object Day2 extends Day {

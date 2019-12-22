@@ -1,3 +1,5 @@
+package dottyaoc
+
 import scala.math.{log => _, _}
 import scala.annotation._
 

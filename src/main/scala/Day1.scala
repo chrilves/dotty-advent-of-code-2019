@@ -1,3 +1,5 @@
+package dottyaoc
+
 import scala.math._
 
 object Day1 extends Day {

@@ -1,3 +1,5 @@
+package dottyaoc
+
 import scala.math.{log => _, _}
 import scala.annotation._
 
@@ -182,6 +184,8 @@ object Day13 extends Day {
       ball: BallInfo,
       paddle: Pos,
       score: BigInt,
+      numberOfReads: Long,
+      numberOfWrites: Long,
       stack: List[BigInt]) {
   
       val viewPort: ViewPort  =
@@ -208,6 +212,8 @@ object Day13 extends Day {
         log(s"Score=${state.score}")
         log(state.ball.message)
         log(s"paddle at ${state.paddle}")
+        log(s"reads: ${state.numberOfReads}")
+        log(s"writes: ${state.numberOfWrites}")
         
         val move: Int =
           if state.ball.pos.y == state.paddle.y - 1 &&
@@ -225,7 +231,7 @@ object Day13 extends Day {
           }
 
         log(s"move: $move")
-        (BigInt(move), state)
+        (BigInt(move), state.copy(numberOfReads = state.numberOfReads + 1))
         /*
         
         print("Where to move (q,s,d): ")
@@ -245,6 +251,8 @@ object Day13 extends Day {
               state.ball,
               state.paddle,
               o,
+              state.numberOfReads,
+              state.numberOfWrites + 1,
               List.empty
             )
           case y :: x    :: Nil =>
@@ -265,6 +273,8 @@ object Day13 extends Day {
               newBall,
               newPaddleX,
               state.score,
+              state.numberOfReads,
+              state.numberOfWrites + 1,
               List.empty
             )
           case _ =>
@@ -273,12 +283,14 @@ object Day13 extends Day {
               state.ball,
               state.paddle,
               state.score,
+              state.numberOfReads,
+              state.numberOfWrites + 1,
               o :: state.stack
             )
         }
     }
 
-    val initialState = State(Map.empty, BallInfo(Pos(0,0), true, true), Pos(0,0), 0, List.empty)
+    val initialState = State(Map.empty, BallInfo(Pos(0,0), true, true), Pos(0,0), 0, 0,0,List.empty)
     val finalState = i.readProgram.run[State](initialState)
 
     finalState.score.toString

@@ -1,3 +1,5 @@
+package dottyaoc
+
 import scala.math._
 import scala.annotation._
 

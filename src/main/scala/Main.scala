@@ -1,3 +1,5 @@
+package dottyaoc
+
 import scala.io._
 
 enum Part {
@@ -55,6 +57,9 @@ trait Day {
     case 1 => Part.One
     case 2 => Part.Two
   }
+
+  //println("Ready to start")
+  //scala.io.StdIn.readLine
 
   theday.run(input)(thepart)
 }
