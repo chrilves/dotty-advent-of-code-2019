@@ -154,7 +154,7 @@ object Day15 extends Day {
   
     given stateIO : StateIO[Move, Print, State] {
       def (state:State) read : (Move, State) = {
-        
+
         log(s"""
 ${state.screen}
 Score=${state.score}
@@ -182,21 +182,21 @@ iteration ${state.iterations}
         (move, state.copy(iterations = state.iterations + 1))
       }
           
-      def (state:State) write(o: Vector[Print]): State = {
+      def (state:State) write(o: List[Print]): State = {
         
         val (newScore, newBall, newPaddle) =
-          o.foldRight((state.score, state.ball, state.paddle)) {
-            case (Print.Score(s)                           ,(score, ball, paddle)) => (s    ,ball            , paddle)
-            case (Print.TilePos(pos, Tile.Ball)            ,(score, ball, paddle)) => (score,ball.update(pos), paddle)
-            case (Print.TilePos(pos, Tile.HorizontalPaddle),(score, ball, paddle)) => (score,ball            , pos   )
-            case (_, acc) => acc
+          o.foldLeft((state.score, state.ball, state.paddle)) {
+            case ((score, ball, paddle), Print.Score(s)                           ) => (s    ,ball            , paddle)
+            case ((score, ball, paddle), Print.TilePos(pos, Tile.Ball)            ) => (score,ball.update(pos), paddle)
+            case ((score, ball, paddle), Print.TilePos(pos, Tile.HorizontalPaddle)) => (score,ball            , pos   )
+            case (acc, _) => acc
           }
         
     
         State(
-          o.foldRight(state.tiles) {
-            case (Print.TilePos(p,t),m) => m + (p -> t)
-            case (_,m) => m
+          o.foldLeft(state.tiles) {
+            case (m, Print.TilePos(p,t)) => m + (p -> t)
+            case (m,_) => m
           },
           newBall,
           newPaddle,
